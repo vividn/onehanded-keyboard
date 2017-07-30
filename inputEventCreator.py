@@ -7,104 +7,14 @@ from ast import literal_eval as make_tuple
 from itertools import permutations
 import os
 
+from keymaps import modKeys, sModKeys, outputMap, inputMap
+
 # Create an event source that can write input events to the system
 ui = UInput()
 
 # Create an inputQueue where input events (with key coordinates) are stored
 inputQueue = []
 
-# Create dictionary for modifiers
-modKeys = {}
-sModKeys = {}
-
-# Create a dictionary for the final mapping of key-coordiantes to outputs
-keymap = {}
-# Load the keymap
-with open("keymap.conf", "r") as keymapfile:
-    for line in keymapfile:
-
-        # Remove comments
-        command = line.split("#")[0].strip()
-
-        # Skip blank or comment-only lines
-        if (not (command)): continue
-
-        # If a key is designated as a modifer add it to the appropriate list
-        p = re.compile('^(S?MOD)\[(\w+)\] (\([^\)]+\))')
-        m = p.search(line)
-        if m:
-            # Extract the groups
-            modType, modName, keyPos = m.groups()
-
-            # Turn keyPos into a tuple
-            keyPos = make_tuple(keyPos)
-
-            # Sort into MOD and SMOD
-            if modType == 'MOD':
-                modKeys[modName] = keyPos
-            elif modType == 'SMOD':
-                sModKeys[modName] = keyPos
-            else:
-                raise Exception("Bad keymap, unknown modifier type")
-
-
-        else:
-            # Otherwise parse the line
-
-            # Separate the key input from the key output and strip of whitespace
-            lineparts = [part.strip() for part in line.split("=")]
-            keyOutput = [part.strip() for part in lineparts[1].split("+")]
-
-            # Now split up the input based on +'s and parse for modifiers
-            unparsedInput = [part.strip() for part in lineparts[0].split("+")]
-            keyInput = []
-
-            for key in unparsedInput:
-                # Test if of the form [ABC] which is a modifier
-                p = re.compile('\[(\w+)\]')
-                m = p.match(key)
-                if m:
-                    modName = m.groups()[0]
-                    # Ensure that this modifier has been defined earlier
-                    if modName in modKeys:
-                        keyInput.append(modKeys[modName])
-                    elif modName in sModKeys:
-                        keyInput.append(sModKeys[modName])
-                    else:
-                        raise Exception("Bad keymap, modifier not defined. Line:\n{0}".format(line))
-
-                else:
-                    # Parse the input as a tuple
-                    keyInput.append(make_tuple(key))
-
-            # Now keyInput has a series of tuples that correspond to the key chord that needs to be pressed to activate the output
-            # Permutate all the possible key combos and put them into the keymap dictionary
-            for permute in permutations(keyInput):
-                keymap[permute] = keyOutput
-
-# Create a dictionaty for the mapping of keycodes to key-coordinates
-inputCodeMap = {}
-# Load the input key mapping
-with open("Dakai_Map.conf", "r") as inputmapfile:
-    for line in inputmapfile:
-
-        # Remove comments
-        command = line.split("#")[0].strip()
-
-        # Skip blank or comment-only lines
-        if (not (command)): continue
-
-        # Separate the keycode from the key-coordinate and strip of whitespace
-        lineparts = [part.strip() for part in line.split("=")]
-
-        keycode = int(lineparts[0])
-        coordinate = make_tuple(lineparts[1])
-
-        # Add to the dictionary
-        inputCodeMap[keycode] = coordinate
-
-
-# Now that the files have been parsed define some functions for interpreting input and writing keys
 
 
 def add_input_to_queue(evdevEvent):
@@ -114,6 +24,8 @@ def add_input_to_queue(evdevEvent):
     coord = inputCodeMap[keycode]
     eventTime = evdevEvent.sec
     keyState = evdevEvent.value
+
+
 
     inputQueue.append({'coord': coord, 'time': eventTime, 'state': keyState, 'keycode': keycode})
 
@@ -131,10 +43,13 @@ def process_queue():
 
 
 def process_queue_helper(queue):
+
     # If the top event on the queue is a key release action, just delete the entry.
     if queue[0]['state'] == 0:
         coord_list = []
-        
+
+    # S
+    elif
 
     return (coord_list, indices_to_delete)
 
