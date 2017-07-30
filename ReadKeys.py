@@ -1,8 +1,7 @@
 import evdev
 from evdev import ecodes
 from select import select
-import code
-import time
+from inputEventCreator import add_input_to_queue, process_queue
 
 deviceName = "DaKai 2.4G RX"
 
@@ -25,4 +24,6 @@ while True:
     for fd in r:
         for event in kbds[fd].read():
             if event.type == 1 and event.value < 2:
-                print(event)
+                add_input_to_queue(event)
+
+    process_queue()
