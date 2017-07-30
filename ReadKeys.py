@@ -1,7 +1,9 @@
 import evdev
+import time
 from evdev import ecodes
 from select import select
 from inputEventCreator import add_input_to_queue, process_queue
+import asyncio
 
 deviceName = "DaKai 2.4G RX"
 
@@ -15,15 +17,23 @@ for dev in allDevices:
         # Make this program the exclusive handler of this device
         dev.grab()
 
-# Create a dictionary that references the input device by its file descriptor
-kbds = {dev.fd: dev for dev in kbds}
+# Define an asynchronous event handler
+async def add_events(device):
+    async for event in device.async_read_loop():
+        if event.type == 1 and event.value < 2:
+            add_input_to_queue(event)
 
-# Now continuously loop and read in input events
-while True:
-    r, w, x = select(kbds, [], [])
-    for fd in r:
-        for event in kbds[fd].read():
-            if event.type == 1 and event.value < 2:
-                add_input_to_queue(event)
+async def procQ():
+    while True:
+        process_queue()
+        await asyncio.sleep(0.1)
 
-    process_queue()
+for dev in kbds:
+    asyncio.ensure_future(add_events(dev))
+
+asyncio.ensure_future(procQ())
+
+loop = asyncio.get_event_loop()
+loop.run_forever()
+
+
