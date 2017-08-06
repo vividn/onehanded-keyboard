@@ -16,7 +16,7 @@ ui.write(e.EV_KEY, e.KEY_NUMLOCK, 0)
 ui.syn()
 
 def add_input_to_queue(evdevEvent):
-    ## Input from the key device is grabbed as evdev events
+    # Input from the key device is grabbed as evdev events
     # Process this event into a dictionary that
     keycode = evdevEvent.code
     coord = inputMap[keycode]
@@ -63,9 +63,9 @@ def process_queue_helper(queue):
         return (),(0,),()
 
     # Get which type of key the first key is
-    if queue[0]['coord'] in sModKeys:
+    if queue[0]['coord'] in sModKeys.values():
         keyType = 'SMOD'
-    elif queue[0]['coord'] in modKeys:
+    elif queue[0]['coord'] in modKeys.values():
         keyType = 'MOD'
     else:
         keyType = 'NORMAL'
@@ -80,7 +80,7 @@ def process_queue_helper(queue):
 
         # Otherwise, just wait for more key presses to come in
 
-    else: # More than 1 event in the queue
+    else:  # More than 1 event in the queue
 
         # Do different things depending on which kind of key this is
         if keyType == 'NORMAL':
@@ -107,7 +107,6 @@ def process_queue_helper(queue):
                     else:
                         # Just delete what the subroutine says to
                         indices_to_delete = tuple(i + 1 for i in sub_inds)
-
 
                 # Otherwise, just return the first key
                 else:
