@@ -34,6 +34,10 @@ for dev in kbds:
 asyncio.ensure_future(procQ())
 
 loop = asyncio.get_event_loop()
-loop.run_forever()
 
-
+try:
+    loop.run_forever()
+except KeyboardInterrupt:
+    pass
+finally:
+    loop.close()
