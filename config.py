@@ -6,4 +6,4 @@
 chordTime = 0.1
 
 # How long a sticky key is held for
-smodStickTime = 0.75
+smodStickTime = 1.25

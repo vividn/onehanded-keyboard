@@ -165,6 +165,8 @@ def process_queue_helper(queue):
                     else:
                         indices_to_delete = tuple(i + 2 for i in sub_inds)
 
+                    mark_used = tuple(i + 2 for i in sub_marks)
+
                 else: # Time has expired, just play the SMOD key by itself
                     coord_list = (queue[0]['coord'],)
                     indices_to_delete = (0,1)
@@ -222,9 +224,14 @@ def get_ecode_list(coord_list):
         return outputMap[coord_list]
 
     else:
-        # If not directly in the keymap test the use of the first key as a modifier
-        if coord_list[0] in modKeys.values():
-            return outputMap[coord_list[0]] + get_ecode_list(coord_list[1:])
+        # If not directly in the keymap test the use of any of the keys as modifiers and then pull them out front
+        for key_coord in coord_list:
+            if key_coord in modKeys.values() or key_coord in sModKeys.values():
+                coord_list = tuple(coord for coord in coord_list if coord != key_coord)
+                return outputMap[(key_coord,)] + get_ecode_list(coord_list)
+
+        # Otherwise, just return the each key indepently
+            return tuple(outputMap[(coord,)] for coord in coord_list)
 
 
 
