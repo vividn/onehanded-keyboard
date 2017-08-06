@@ -10,14 +10,19 @@ ui = UInput()
 # Create an inputQueue where input events (with key coordinates) are stored
 inputQueue = []
 
-
+# Turn off numlock (program starts with numlock on automatically
+ui.write(e.EV_KEY, e.KEY_NUMLOCK, 1)
+ui.write(e.EV_KEY, e.KEY_NUMLOCK, 0)
+ui.syn()
 
 def add_input_to_queue(evdevEvent):
     ## Input from the key device is grabbed as evdev events
     # Process this event into a dictionary that
     keycode = evdevEvent.code
     coord = inputMap[keycode]
-    eventTime = evdevEvent.sec
+    # TODO: Put warning if no match for the keycode exists
+    # TODO: Something about numlock
+    eventTime = evdevEvent.timestamp()
     keyState = evdevEvent.value
 
 
@@ -30,25 +35,32 @@ def process_queue():
     global inputQueue
     inputQueue = sorted(inputQueue, key=itemgetter('time'))
 
-    while len(inputQueue) > 0:
-        (coord_list, indices_to_delete) = process_queue_helper(inputQueue)
-        write_from_coords(coord_list)
+    (coord_list, indices_to_delete, mark_used) = process_queue_helper(inputQueue)
+    write_from_coords(coord_list)
 
-        for i in sorted(indices_to_delete, reverse=True):
-            del inputQueue[i]
+    for i in mark_used:
+        inputQueue[i]['used'] = True
+
+    for i in sorted(indices_to_delete, reverse=True):
+        del inputQueue[i]
 
 
 def process_queue_helper(queue):
 
     nKeys = len(queue)
 
+    # By default send nothing, delete nothing, and mark nothing unless explicitly stated
+    coord_list = ()
+    indices_to_delete = ()
+    mark_used = ()
+
     # Return if input queue is empty
     if nKeys == 0:
-        return (),()
+        return (),(),()
 
     # If the top event on the queue is a key release action, just delete the entry.
     if queue[0]['state'] == 0:
-        return (),(0,)
+        return (),(0,),()
 
     # Get which type of key the first key is
     if queue[0]['coord'] in sModKeys:
@@ -58,66 +70,146 @@ def process_queue_helper(queue):
     else:
         keyType = 'NORMAL'
 
-    if nKeys >= 2:
+    if nKeys == 1:
+        # Only one event in queue
 
-        # If the second event is just releasing the button (no chord has occurred)
-        if queue[1]['coord'] == queue[0]['coord']:
+        # Output the key if it is NORMAL and sufficient time waiting for key chords has passed
+        if keyType == 'NORMAL' and time.time() - queue[0]['time'] > 2 * config.chordTime:
+            coord_list = (queue[0]['coord'],)
+            indices_to_delete = (0,)
 
-            if keyType == 'SMOD' and time.time() - queue[0]['time'] <= smodStickTime:
-                # Wait for more input if a sticky modifier is pressed
-                coord_list = ()
-                indices_to_delete = ()
+        # Otherwise, just wait for more key presses to come in
 
-            else:
-                # Return just key otherwise
+    else: # More than 1 event in the queue
+
+        # Do different things depending on which kind of key this is
+        if keyType == 'NORMAL':
+            # If the key type is NORMAL, then one of two things can happen, either the key is by itself or
+            # part of a chord
+
+            # If the second event is just releasing the button (no chord has occurred)
+            if queue[1]['coord'] == queue[0]['coord']:
+                # Return just key
                 coord_list = (queue[0]['coord'],)
                 indices_to_delete = (0,1)
 
-        # If the next key occurs quickly or first key is a modifier, treat the input as a key chord
-        elif queue[1]['time'] - queue[0]['time'] <= config.chordTime or keyType != 'NORMAL':
-            # Call process_queue_helper recursively to allow for arbitrarily big key chords
-            [sub_coords, sub_inds] = process_queue_helper(queue[1:-1])
+            else: # The event is some other key
+                # This is a key chord if the second press is a key press (not release) and occurs within the key chord time
+                if queue[1]['state'] == 1 and queue[1]['time'] - queue[0]['time'] <= config.chordTime:
+                    # Call process_queue_helper recursively to allow for arbitrarily big key chords
+                    [sub_coords, sub_inds, sub_marks] = process_queue_helper(queue[1:])
 
-            coord_list = (queue[0]['coord'],) + sub_coords
-            indices_to_delete = (0,) + (i + 1 for i in sub_coords)
+                    # Only send the key chord if the recursive call returns anything
+                    if sub_coords:
+                        coord_list = (queue[0]['coord'],) + sub_coords
+                        indices_to_delete = (0,) + tuple(i + 1 for i in sub_inds)
 
-        # Otherwise, just output the key by itself
-        else:
-            coord_list = (queue[0]['coord'],)
-            indices_to_delete = (0,)
+                    else:
+                        # Just delete what the subroutine says to
+                        indices_to_delete = tuple(i + 1 for i in sub_inds)
 
-    else:
-        # Only one event in queue
 
-        # Output the key if NORMAL key and the time for key chords has passed
-        if keyType == 'NORMAL' and time.time() - queue[0]['time'] > config.chordTime:
-            coord_list = (queue[0]['coord'],)
-            indices_to_delete = (0,)
+                # Otherwise, just return the first key
+                else:
+                    coord_list = (queue[0]['coord'],)
+                    indices_to_delete = (0,)
 
-        else:
-            # Otherwise, just wait for more key presses to come in
-            coord_list = ()
-            indices_to_delete = ()
 
-    return coord_list, indices_to_delete
+        elif keyType == 'MOD':
+            # MOD keys must be pressed and held for them to stay active
+
+            # If the next key is just the mod key being released, then send the MOD key by itself
+            # That is, unless it has been used with some other keys first
+            if queue[1]['coord'] == queue[0]['coord']:
+
+                # If the MOD key has been used in conjunction with other keys, just delete the key down and up events
+                if 'used' in queue[0] and queue[0]['used']:
+                    indices_to_delete = (0,1)
+
+                # Otherwise play the MOD key
+                else:
+                    coord_list = (queue[0]['coord'],)
+                    indices_to_delete = (0,1)
+
+            # Recursively call the this process_queue_helper function to process key coords that occur with the MOD key attached
+            else:
+                [sub_coords, sub_inds, sub_marks] = process_queue_helper(queue[1:])
+
+                # Only send key input if the recursive call returns anything
+                if sub_coords:
+                    coord_list = (queue[0]['coord'],) + sub_coords
+                    # Mark the mod key as used so it won't return its own input later
+                    mark_used = (0,)
+
+                indices_to_delete = tuple(i + 1 for i in sub_inds)
+                mark_used = mark_used + tuple(i + 1 for i in sub_marks)
+
+
+        elif keyType == 'SMOD':
+
+            # If the SMOD key is pressed and released, it acts like it sticks
+            # allowing another key or key chord to be pressed afterwards for smodStickTime
+            if queue[1]['coord'] == queue[0]['coord']:
+
+                # If the SMOD key has already been used in conjunction with other (i.e. not in a sticky way),
+                # just delete the key down and up events
+                if 'used' in queue[0] and queue[0]['used']:
+                    indices_to_delete = (0, 1)
+
+                elif time.time() - queue[0]['time'] <= config.smodStickTime:
+                    # Recursively call the this process_queue_helper function to process the first key or key chord that occurs after the SMOD key
+                    [sub_coords, sub_inds, sub_marks] = process_queue_helper(queue[2:])
+
+                    if sub_coords:
+                        coord_list = (queue[0]['coord'],) + sub_coords
+                        indices_to_delete = (0,1) + tuple(i + 2 for i in sub_inds)
+                    else:
+                        indices_to_delete = tuple(i + 2 for i in sub_inds)
+
+                else: # Time has expired, just play the SMOD key by itself
+                    coord_list = (queue[0]['coord'],)
+                    indices_to_delete = (0,1)
+
+
+            else: # SMOD key is being held and acts just like a MOD key
+                [sub_coords, sub_inds, sub_marks] = process_queue_helper(queue[1:])
+
+                # Only send key input if the recursive call returns anything
+                if sub_coords:
+                    coord_list = (queue[0]['coord'],) + sub_coords
+                    # Mark the SMOD key as used so it won't act sticky or return its own input later
+                    mark_used = (0,)
+
+                indices_to_delete = tuple(i + 1 for i in sub_inds)
+                mark_used = mark_used + tuple(i + 1 for i in sub_marks)
+
+
+    return coord_list, indices_to_delete, mark_used
 
 
 def write_from_coords(coord_list):
     # Output the key stroke events to the computer
 
-    # Turn the coordinates into their appropriate list of key names to be outputted
-    ecode_list = get_ecode_list(coord_list)
+    # Only do this if the coord_list is not empty
+    if coord_list:
+        # Turn the coordinates into their appropriate list of key names to be outputted
+        ecode_list = get_ecode_list(coord_list)
 
-    # Get the integer key value for each key name (e.g., KEY_A -> 30)
-    ecodes = [e.ecodes[str] for str in ecode_list]
+        # Get the integer key value for each key name (e.g., KEY_A -> 30)
+        ecodes = [e.ecodes[str] for str in ecode_list]
 
-    # First press down each key sequentially
-    for ecode in ecodes:
-        ui.write(e.EV_KEY, ecode, 1)
+        # First press down each key sequentially
+        for ecode in ecodes:
+            ui.write(e.EV_KEY, ecode, 1)
 
-    # Then release each key sequentially
-    for ecode in ecodes:
-        ui.write(e.EV_KEY, ecode, 0)
+        # Then release each key sequentially
+        for ecode in ecodes:
+            ui.write(e.EV_KEY, ecode, 0)
+
+        # Now send these writes to the system
+        ui.syn()
+
+
 
 
 
@@ -128,12 +220,12 @@ def get_ecode_list(coord_list):
 
     # Searches through the keymap for the given chord
     if coord_list in outputMap:
-        return keymap[coord_list]
+        return outputMap[coord_list]
 
     else:
         # If not directly in the keymap test the use of the first key as a modifier
         if coord_list[0] in modKeys.values():
-            return keymap[coord_list[0]] + get_ecode_list(coord_list[1:])
+            return outputMap[coord_list[0]] + get_ecode_list(coord_list[1:])
 
 
 
