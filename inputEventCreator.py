@@ -3,6 +3,7 @@ from evdev import UInput, ecodes as e
 import config
 from operator import itemgetter
 from keymaps import modKeys, sModKeys, outputMap, inputMap
+import warnings
 
 # Create an event source that can write input events to the system
 ui = UInput()
@@ -10,7 +11,7 @@ ui = UInput()
 # Create an inputQueue where input events (with key coordinates) are stored
 inputQueue = []
 
-# Turn off numlock (program starts with numlock on automatically
+# Turn off numlock (program starts with numlock on automatically)
 ui.write(e.EV_KEY, e.KEY_NUMLOCK, 1)
 ui.write(e.EV_KEY, e.KEY_NUMLOCK, 0)
 ui.syn()
@@ -21,7 +22,6 @@ def add_input_to_queue(evdevEvent):
     keycode = evdevEvent.code
     coord = inputMap[keycode]
     # TODO: Put warning if no match for the keycode exists
-    # TODO: Something about numlock
     eventTime = evdevEvent.timestamp()
     keyState = evdevEvent.value
 
@@ -219,20 +219,26 @@ def get_ecode_list(coord_list):
     if not coord_list:
         return []
 
-    # Searches through the keymap for the given chord
-    if coord_list in outputMap:
-        return outputMap[coord_list]
+    # Catch Key Errors, if some key has an undefined output
+    try:
+        # Searches through the keymap for the given chord
+        if coord_list in outputMap:
+            return outputMap[coord_list]
 
-    else:
-        # If not directly in the keymap test the use of any of the keys as modifiers and then pull them out front
-        for key_coord in coord_list:
-            if key_coord in modKeys.values() or key_coord in sModKeys.values():
-                coord_list = tuple(coord for coord in coord_list if coord != key_coord)
-                return outputMap[(key_coord,)] + get_ecode_list(coord_list)
+        else:
+            # If not directly in the keymap test the use of any of the keys as modifiers and then pull them out front
+            for key_coord in coord_list:
+                if key_coord in modKeys.values() or key_coord in sModKeys.values():
+                    coord_list = tuple(coord for coord in coord_list if coord != key_coord)
+                    return outputMap[(key_coord,)] + get_ecode_list(coord_list)
 
-        # Otherwise, just return the each key indepently
-            return tuple(outputMap[(coord,)] for coord in coord_list)
+            # Otherwise, just return the each key independently
+                return tuple(outputMap[(coord,)] for coord in coord_list)
 
+    except KeyError:
+        warnings.warn('Some undefined key has been used')
+        return ()
+        pass
 
 
 
