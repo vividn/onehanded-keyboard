@@ -17,10 +17,10 @@ with open("keymap.conf", "r") as keymapfile:
     for line in keymapfile:
 
         # Remove comments
-        command = line.split("#")[0].strip()
+        line = line.split("#")[0].strip()
 
         # Skip blank or comment-only lines
-        if (not (command)): continue
+        if (not (line)): continue
 
         # If a key is designated as a modifer add it to the appropriate list
         p = re.compile('^(S?MOD)\[(\w+)\] (\([^\)]+\))')
@@ -83,10 +83,10 @@ with open("Dakai_Map.conf", "r") as inputmapfile:
     for line in inputmapfile:
 
         # Remove comments
-        command = line.split("#")[0].strip()
+        line = line.split("#")[0].strip()
 
         # Skip blank or comment-only lines
-        if (not (command)): continue
+        if (not (line)): continue
 
         # Separate the keycode from the key-coordinate and strip of whitespace
         lineparts = [part.strip() for part in line.split("=")]
