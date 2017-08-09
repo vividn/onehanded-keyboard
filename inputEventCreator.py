@@ -20,14 +20,20 @@ def add_input_to_queue(evdevEvent):
     # Input from the key device is grabbed as evdev events
     # Process this event into a dictionary that
     keycode = evdevEvent.code
-    coord = inputMap[keycode]
-    # TODO: Put warning if no match for the keycode exists
-    eventTime = evdevEvent.timestamp()
-    keyState = evdevEvent.value
 
+    # Catch unexpected keys
+    try:
+        coord = inputMap[keycode]
 
+        if coord:
+            eventTime = evdevEvent.timestamp()
+            keyState = evdevEvent.value
+            inputQueue.append({'coord': coord, 'time': eventTime, 'state': keyState, 'keycode': keycode})
 
-    inputQueue.append({'coord': coord, 'time': eventTime, 'state': keyState, 'keycode': keycode})
+    except KeyError:
+        warnings.warn('Unexpected input')
+        pass
+
 
 
 def process_queue():
