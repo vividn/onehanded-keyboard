@@ -239,7 +239,11 @@ def get_ecode_list(coord_list):
                     return outputMap[(key_coord,)] + get_ecode_list(coord_list)
 
             # Otherwise, just return the each key independently
-                return tuple(outputMap[(coord,)] for coord in coord_list)
+                else:
+                    return_list = []
+                    for coord in coord_list:
+                        return_list += outputMap[(coord,)]
+                    return return_list
 
     except KeyError:
         warnings.warn('Some undefined key has been used')
