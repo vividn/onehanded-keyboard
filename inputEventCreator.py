@@ -197,7 +197,7 @@ def write_from_coords(coord_list):
         ecode_list = get_ecode_list(coord_list)
 
         # Get the integer key value for each key name (e.g., KEY_A -> 30)
-        ecodes = [e.ecodes[str] for str in ecode_list]
+        ecodes = [e.ecodes[str] for str in ecode_list if str]
 
         # First press down each key sequentially
         for ecode in ecodes:
