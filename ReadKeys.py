@@ -26,7 +26,7 @@ async def add_events(device):
 async def procQ():
     while True:
         process_queue()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.05)
 
 for dev in kbds:
     asyncio.ensure_future(add_events(dev))
