@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 import evdev
 import time
 from evdev import ecodes
